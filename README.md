@@ -85,8 +85,8 @@ The corporate workstation is permitted to use specifically authorized services o
 
 For example:
 
-- CORP_NET → Ubuntu SSH (`TCP/22`) — **Allowed**
-- Unauthorized CORP_NET → internal traffic — **Blocked**
+- CORP_NET → Ubuntu SSH (`TCP/22`) - **Allowed**
+- Unauthorized CORP_NET → internal traffic - **Blocked**
 
 ### SERVER_NET
 
@@ -94,10 +94,10 @@ The Ubuntu server is prevented from initiating connections into the corporate an
 
 Outbound server access is restricted to required services:
 
-- DNS — `TCP/UDP 53`
-- HTTP — `TCP 80`
-- HTTPS — `TCP 443`
-- NTP — `UDP 123`
+- DNS - `TCP/UDP 53`
+- HTTP - `TCP 80`
+- HTTPS - `TCP 443`
+- NTP - `UDP 123`
 
 A temporary unrestricted SERVER_NET rule used during troubleshooting was removed after the required outbound services were identified and tested.
 
@@ -107,11 +107,11 @@ Kali Linux operates from a dedicated security network.
 
 Specific permissions include:
 
-- SECURITY_NET → Ubuntu SSH (`TCP/22`) — **Allowed**
-- SECURITY_NET → pfSense ICMP Echo Request — **Allowed**
-- SECURITY_NET → pfSense DNS (`TCP/UDP 53`) — **Allowed**
-- SECURITY_NET → general internal networks — **Blocked**
-- SECURITY_NET → Internet — **Allowed**
+- SECURITY_NET → Ubuntu SSH (`TCP/22`) - **Allowed**
+- SECURITY_NET → pfSense ICMP Echo Request - **Allowed**
+- SECURITY_NET → pfSense DNS (`TCP/UDP 53`) - **Allowed**
+- SECURITY_NET → general internal networks - **Blocked**
+- SECURITY_NET → Internet - **Allowed**
 
 Because pfSense uses stateful filtering, response traffic for permitted connections is automatically allowed without creating unnecessary reverse-direction rules.
 
@@ -197,6 +197,86 @@ This provided validation from both the client and firewall perspectives.
 
 ---
 
+## Validation Evidence
+
+### Final Firewall Policies
+
+#### CORP_NET / LAN Policy
+
+The CORP_NET policy permits authorized SSH access to the Ubuntu server while blocking general access to internal networks before permitting other outbound traffic.
+
+![Final CORP_NET Firewall Policy](screenshots/pfsense/lan-corp-net-final-policy.png)
+
+#### SERVER_NET / OPT1 Policy
+
+The SERVER_NET policy prevents the Ubuntu server from initiating connections into CORP_NET and SECURITY_NET. Outbound access is restricted to approved DNS, web, and NTP services.
+
+![Final SERVER_NET Firewall Policy](screenshots/pfsense/opt1-server-net-final-policy.png)
+
+#### SECURITY_NET / OPT2 Policy
+
+The SECURITY_NET policy permits specific administrative and infrastructure services while preventing unrestricted access to internal networks.
+
+![Final SECURITY_NET Firewall Policy](screenshots/pfsense/opt2-security-net-final-policy.png)
+
+---
+
+### Firewall Aliases
+
+#### IP and Network Aliases
+
+`INTERNAL_NETWORKS` groups the protected internal subnets, while `PUBLIC_DNS` contains the approved external DNS resolvers.
+
+![pfSense IP Aliases](screenshots/pfsense/firewall-ip-aliases.png)
+
+#### Port Aliases
+
+`WEB_PORTS` groups ports 80 and 443 for HTTP and HTTPS access.
+
+![pfSense Port Aliases](screenshots/pfsense/firewall-port-aliases.png)
+
+---
+
+### Nmap Segmentation Validation
+
+Nmap testing from SECURITY_NET confirmed that SSH was reachable on the Ubuntu server while unauthorized tested services were filtered. Tested Windows services on CORP_NET were also filtered.
+
+![Nmap Segmentation Validation](screenshots/kali/nmap-segmentation-validation.png)
+
+---
+
+### Firewall Block Validation
+
+A controlled SMB probe from Kali (`10.10.30.10`) to the Windows workstation (`10.10.10.100:445`) was reported as filtered by Nmap.
+
+The corresponding pfSense log confirmed that the traffic was blocked on OPT2 by the `BLOCK - SEC_NET TO INTERNAL NETWORKS` rule.
+
+![pfSense Firewall Block Log](screenshots/pfsense/firewall-block-log-validation.png)
+
+---
+
+### SERVER_NET Egress Validation
+
+The temporary unrestricted SERVER_NET outbound rule was disabled before testing the permanent least-privilege rules.
+
+#### DNS
+
+Ubuntu successfully resolved external domain names using the approved `PUBLIC_DNS` servers over TCP/UDP port 53.
+
+![Ubuntu DNS Validation](screenshots/ubuntu/dns-egress-validation.png)
+
+#### HTTPS
+
+Ubuntu successfully established an HTTPS connection after outbound access was restricted to approved web ports.
+
+![Ubuntu HTTPS Validation](screenshots/ubuntu/https-egress-validation.png)
+
+#### NTP
+
+Ubuntu successfully synchronized with an external NTP server using UDP port 123.
+
+![Ubuntu NTP Validation](screenshots/ubuntu/ntp-egress-validation.png)
+
 ## Troubleshooting
 
 ### Kali DNS Failure
@@ -272,10 +352,4 @@ This project demonstrates practical experience with:
 
 ---
 
-## Project Status
 
-**Core network infrastructure:** Complete  
-**Network segmentation:** Complete  
-**Firewall policy implementation:** Complete  
-**Security validation:** Complete  
-**Documentation:** In progress
